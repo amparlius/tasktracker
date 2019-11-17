@@ -1,31 +1,11 @@
 <?php
-	// Database connection
-	$db_host = "localhost";
-	$db_name = "homlin";
-	$db_user = "homlin";
-	$db_password = "tee6Koph";
-	$link= "mysql:host=" . $db_host . ";dbname=". $db_name . ";charset=UTF8";
-	try {  
-		$db = new PDO($link, $db_user, $db_password, array(PDO::MYSQL_ATTR_INIT_COMMAND => 'SET NAMES \'UTF8\'')); 
-		$db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);												
-	}  
-	catch(PDOException $e) {  
-		echo $e->getMessage();  
-	}; 
-
+	include_once("config.php");
 	$ErrorMsgAdd="";
 	$ErrorMsg= "";
 	$admin_edited="<div><i>отредактировано администратором</i></div>";
 	
 	session_start();
 	$user="guest"; 
-	// user logout 
-	if ($_GET["logout"]==="true") {
-		unset($_SESSION["username"]);
-		session_destroy();
-		$_SESSION["username"]="guest";
-		$message = "Вы вышли из системы";
-	};	
 	
 	// user login
 	if (  ($_POST["user"]==="admin") && (MD5($_POST["password"])==="202cb962ac59075b964b07152d234b70") ){
@@ -41,6 +21,13 @@
 	};
 	$enable_table_edit = ($user=="admin") ? " class='table_data'" : "";
 	
+	// user logout 
+	if ($_GET["logout"]==="true") {
+		unset($_SESSION["username"]);
+		session_destroy();
+		$_SESSION["username"]="guest";
+		$message = "Вы вышли из системы";
+	};	
 	
 	// sorting
 	
@@ -49,7 +36,7 @@
 			$page=$_GET["page"]; 
 			$_SESSION["page"]=$page;
 		}
-		else{
+		else {
 			if (isset($_SESSION["page"])) {
 				$page=$_SESSION["page"]; 
 			}
@@ -63,14 +50,14 @@
 			$order=$_GET["order"]; 
 			$_SESSION["order"]=$order;
 		}
-		else{
+		else {
 			$order = (isset($_SESSION["order"])) ? $_SESSION["order"] : "ASC"; 
 		}
 		if ($order=="ASC") {
 			$order_next =  "DESC";
 			$sort_icon="&nbsp;<span class='glyphicon glyphicon-sort-by-alphabet'>&#9660;</span>";
 		}
-		else{
+		else {
 			$order_next =  "ASC";
 			$sort_icon="&nbsp;<span class='glyphicon glyphicon-sort-by-alphabet-alt'>&#9650;</span>";
 		};
@@ -83,15 +70,12 @@
 				$colomn=$_GET["colomn"]; 
 			}
 		}
-		else{
+		else {
 			if (isset($_SESSION["colomn"])) {
 				$colomn=$_SESSION["colomn"]; 
 			}
 		};
 		$_SESSION["colomn"]=$colomn;
-	 
-	
-
 	
 
 	
@@ -112,7 +96,6 @@
 			$sth->bindParam(':frm_task_text', $frm_task_text);
 			$sth->bindParam(':frm_status', $frm_status);
 			  
-			
 			try {  
 				$sth->execute();
 				$message = ($_POST["id"]>0) ? "Задача успешно изменена" : "Задача успешно добавлена";
@@ -121,39 +104,65 @@
 				echo "Ошибка при добавлении / обновлении строки в базу: ".  $e->getMessage();  
 			};
 		}
-		else{ 
+		else { 
 			$ErrorMsgAdd="Необходимо войти в систему";
-		}
-		  
+		}	  
 	};
-				
-			?><!doctype html>
-<html lang="ru">
-
-
-  <head>
-    <!-- Required meta tags -->
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-	<link rel="Shortcut Icon" href="/favicon.ico" type="image/x-icon"> 	
-    <!-- Bootstrap CSS -->
-    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
-
-		<title>Задачник</title>
-	</head>
-	<body>
+			  	
+	// pagination calculations			
+	$limit=3;
+	$sth = $db->prepare("SELECT * FROM beejee_test");
+	$sth->execute();
+	$allResp = $sth->fetchAll(PDO::FETCH_ASSOC);
+	$total_results = $sth->rowCount();
+	$total_pages = ceil($total_results/$limit);
+	$start = ($page-1)*$limit;
 	
-		 <div class="d-flex flex-column flex-md-row align-items-center p-3 px-md-4 mb-3 bg-white border-bottom shadow-sm">
-			  <h1 class="my-0 mr-md-auto font-weight-normal">Задачи</h1>
-			  <?php
-			  if ($message!=""){echo "<span class='btn btn-success'>" . $message . "</span> &nbsp;";} 
+	// getting data for main table 		
+	$sql="SELECT * FROM beejee_test ORDER BY " .$colomn. " ". $order ." LIMIT " . $start . ", " . $limit . ";";
+	$sth = $db->prepare($sql);
+	$sth->execute();
+	$sth->setFetchMode(PDO::FETCH_OBJ);
+	$results = $sth->fetchAll();	
+	$tbody="";
+ 
+	foreach($results as $result){
+		$tbody=$tbody. "<tr " . $enable_table_edit . ">\n";
+		$tbody=$tbody. "	<td>" . $result->task_id . "</td>\n";
+		$tbody=$tbody. "	<td>" . htmlspecialchars($result->username) . "</td>\n";
+		$tbody=$tbody. "	<td>" . htmlspecialchars($result->email) . "</td>\n";
+		$tbody=$tbody. "	<td>" . htmlspecialchars($result->task_text);  
+		if ($result->status==1) {$tbody=$tbody. $admin_edited;};
+		$tbody=$tbody. "</td>\n";
+		$tbody=$tbody. "	<td>" . str_replace("1","&#10004;",str_replace("0","",$result->status)) . "</td>\n";   
+		$tbody=$tbody. "</tr>\n";   
+	};		
+
+	// creating dynamic navigation buttons and message area
+	$menu_buttons="";
+	if ($message!=""){$menu_buttons=$menu_buttons . "<span class='btn btn-success'>" . $message . "</span> &nbsp;";} 
 			  if ($user==="admin"){
-					echo 'Пользователь: admin &nbsp; <a class="btn btn-primary" href="index.php?logout=true">Выйти</a> &nbsp;';
+					$menu_buttons=$menu_buttons . 'Пользователь: admin &nbsp; <a class="btn btn-primary" href="index.php?logout=true">Выйти</a> &nbsp;';
 			  }
 			  else {
-				  echo ' <button class="btn btn-primary" data-toggle="modal" data-target="#loginModal">Войти</button> &nbsp;';  
+				  $menu_buttons=$menu_buttons . ' <button class="btn btn-primary" data-toggle="modal" data-target="#loginModal">Войти</button> &nbsp;';  
 			  };
-			  ?>
+				
+?>
+<!doctype html>
+<html lang="ru">
+	<head>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+		<link rel="Shortcut Icon" href="/favicon.ico" type="image/x-icon"> 	
+		<link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
+		<title>Задачи</title>
+	</head>
+	<body>
+		<!-- Header -->
+		 <div class="d-flex flex-column flex-md-row align-items-center p-3 px-md-4 mb-3 bg-white border-bottom shadow-sm">
+			  <h1 class="my-0 mr-md-auto font-weight-normal">Задачи</h1>
+			  <? echo $menu_buttons;?>
 			  <button class="btn btn-primary" id="addTaskButton"> Добавить задачу </button> &nbsp;
 			  <button class="btn btn-primary" data-toggle="modal" data-target="#helpModal" id="helpModalButton"> Справка </button>
 		</div>
@@ -175,7 +184,7 @@
 										<input type="hidden" id="atmf_id" name="id" class="form-control" >
 										<input type="text"   id="atmf_username" name="username" class="form-control"  placeholder="Имя пользователя" required>
 										<input type="email"  id="atmf_email" name="email"    class="form-control"  placeholder="E-mail" required>
-										Задача выполнена&nbsp;<input type="checkbox"   id="atmf_status" name="status"   class="form-control">
+										Задача выполнена&nbsp;<input type="checkbox" id="atmf_status" name="status">
 									</div>
 								</div>
 								<div class="form-row">
@@ -230,7 +239,7 @@
 			  <div class="modal-body">
 				<ul>
 					<li> Для редактирования записей необходимо войти в систему под учетной записью администратора и сделать даблклик на интересующем столбце таблицы.</li> 
-					<li> Добавление записей можно осуществлять без входа в систему
+					<li> Добавление записей можно осуществлять без входа в систему.</li>
 				</ul>	
 			  </div>
 			  <div class="modal-footer">
@@ -240,6 +249,7 @@
 		  </div>
 		</div>
 
+		<!-- Main page -->
 		<div class="container">
 			<div class="row">
 				<div class="col">					
@@ -247,7 +257,6 @@
 						<div class="row">
 							<div class="col">
 								<table class="table table-hover table-bordered">
-									<!--<caption>Задачник</caption>-->
 									<thead class="table-dark">
 										<tr style="cursor:hand !important;">
 											<th scope="col" onclick="sort('task_id');">#<?if ($colomn=="task_id"){echo $sort_icon;} ?></th>
@@ -258,35 +267,7 @@
 										</tr>
 									</thead>
 									<tbody>
-										<?php
-											$limit=3;
-											$sth = $db->prepare("SELECT * FROM beejee_test");
-											$sth->execute();
-											$allResp = $sth->fetchAll(PDO::FETCH_ASSOC);
-											$total_results = $sth->rowCount();
-											$total_pages = ceil($total_results/$limit);
-
-											$start = ($page-1)*$limit;
-											$sql="SELECT * FROM beejee_test ORDER BY " .$colomn. " ". $order ." LIMIT " . $start . ", " . $limit . ";";
-											$sth = $db->prepare($sql);
-											$sth->execute();
-
-											// set the resulting array to associative
-											$sth->setFetchMode(PDO::FETCH_OBJ);
-											$results = $sth->fetchAll();	
-										 
-											foreach($results as $result){
-												echo "<tr " . $enable_table_edit . ">\n";
-												echo "	<td>" . $result->task_id . "</td>\n";
-												echo "	<td>" . htmlspecialchars($result->username) . "</td>\n";
-												echo "	<td>" . htmlspecialchars($result->email) . "</td>\n";
-												echo "	<td>" . htmlspecialchars($result->task_text);  
-												if ($result->status==1) {echo $admin_edited;};
-												echo "</td>\n";
-												echo "	<td>" . str_replace("1","&#10004;",str_replace("0","",$result->status)) . "</td>\n";   
-												echo "</tr>\n";   
-											};
-										?> 
+										<?php echo $tbody;?> 
 									</tbody>
 								</table>
 							
@@ -345,11 +326,11 @@
 				$("#addTaskModal").modal(focus);
 			});
 			
-			// sort 
+			// sorting 
 			function sort(colomn){
 				document.location='index.php?page=<?php echo $page;?>&colomn=' + colomn + '&order=<?php echo $order_next;?>';
 			}
-		</script>
+		</script> 
 		<?php 
 		// loading of login modal if there were errors with login or editing rows without authorisation 
 		if (($ErrorMsg!="") || ($ErrorMsgAdd!=""))    {echo '<script> $("#loginModal").modal(focus);</script>';}; 
